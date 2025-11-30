@@ -1,0 +1,12 @@
+[
+  { "title": "ホーム", "link": "https://hokurd.github.io/" },
+  { "title": "お知らせ", "link": "https://hokurd.github.io/news/" },
+  { "title": "管理から選ぶ", "link": "https://hokurd.github.io/mgmt/" },
+  { "title": "国から選ぶ", "link": "https://hokurd.github.io/country/" },
+  { "title": "県から選ぶ", "link": "https://hokurd.github.io/pref/" },
+  { "title": "自治体から選ぶ", "link": "https://hokurd.github.io/municipality/" },
+  { "title": "道路から選ぶ", "link": "https://hokurd.github.io/road/" },
+  { "title": "提供", "link": "https://hokurd.github.io/offer/" },
+  { "title": "リンク集", "link": "https://hokurd.github.io/link/" },
+  { "title": "お問い合わせ", "link": "https://hokurd.github.io/support/" }
+]
