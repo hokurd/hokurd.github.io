@@ -66,6 +66,22 @@ aside#menu {
   box-sizing: border-box;
 }
 
+@media screen and (max-width: 768px) {
+  .container {
+    flex-direction: column;
+  }
+
+  aside#menu {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #c6cccf;
+  }
+
+  main#content {
+    padding: 1.5em;
+  }
+}
+
 aside#menu ul {
   list-style: none;
   padding: 0;
@@ -85,40 +101,6 @@ aside#menu a {
 
 aside#menu a:hover {
   color: #3cbceb;
-}
-
-@media screen and (max-width: 768px) {
-  .container {
-    flex-direction: column;
-  }
-
-  aside#menu {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid #c6cccf;
-    padding: 0;
-  }
-
-  #menu-toggle {
-    width: 100%;
-    padding: 1em;
-    background: #00a7e3;
-    color: #fff;
-    border: none;
-    font-size: 1em;
-    font-weight: bold;
-    cursor: pointer;
-    text-align: left;
-  }
-
-  aside#menu ul {
-    display: none;
-    padding: 1em;
-  }
-
-  aside#menu.open ul {
-    display: block;
-  }
 }
 
 main#content {
