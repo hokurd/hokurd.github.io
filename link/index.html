@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="北陸地区の道路をまとめたページです。">
+  <meta name="robots" content="index, follow">
+
+  <meta property="og:title" content="ほくりく道路図鑑">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ほくりく道路図鑑">
+  <meta property="og:locale" content="ja_JP">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="ほくりく道路図鑑">
+  <meta name="twitter:description" content="北陸地区の道路をまとめたページです。">
+
+  <title>ほくりく道路図鑑 | リンク集</title>
+  <link rel="stylesheet" href="https://hokurd.github.io/assets/css/common.css">
+  <link rel="icon" href="https://hokurd.github.io/assets/img/car/521_1st.png">
+</head>
+<body>
+  <header>
+    <h1><a href="https://hokurd.github.io/" style="color: white;"><img src="https://hokurd.github.io/assets/img/car/521_1st.png" alt="鉄道車両画像"> ほくりく道路図鑑</a></h1>
+  </header>
+
+  <div class="container">
+    <aside id="menu"></aside>
+
+    <main id="content">
+      <section>
+        <h2>リンク集</h2>
+        <p>このサイトに関連したリンク集です。</p>
+        <h3>グループ</h3>
+        <a href="http://hokumelo.github.io/" class="contact-button"><img src="https://hokumelo.github.io/assets/img/car/683_thunderbird_door.png" alt="ほくりく道路図鑑"> ほくりく駅メロ図鑑</a>
+        <a href="http://hokuriv.github.io/" class="contact-button"><img src="https://hokuriv.github.io/assets/img/riv/toyama_jinzu.png" alt="ほくりく河川図鑑"> ほくりく河川図鑑</a>
+        <h3>画像</h3>
+        <a href="https://commons.wikimedia.org/wiki/User:Axpde/BSicons_heavy" class="contact-button"><img src="https://hokurd.github.io/assets/img/logo/wikimediacommons.png" alt="Wikimedia Commons"> Wikimedia Commons</a>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    <p>Copyright © いゆかも工房 All rights reserved.</p>
+  </footer>
+
+  <script>
+    fetch('https://hokurd.github.io/assets/json/menu.json')
+      .then(res => res.json())
+      .then(data => {
+        const menu = document.getElementById('menu');
+        const ul = document.createElement('ul');
+        data.forEach(item => {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = item.link;
+          a.textContent = item.title;
+          li.appendChild(a);
+          ul.appendChild(li);
+        });
+        menu.appendChild(ul);
+      });
+  </script>
+</body>
+</html>
