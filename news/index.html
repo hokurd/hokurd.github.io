@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="北陸地区の道路をまとめたページです。">
+  <meta name="robots" content="index, follow">
+
+  <meta property="og:title" content="ほくりく道路図鑑">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ほくりく道路図鑑">
+  <meta property="og:locale" content="ja_JP">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="ほくりく道路図鑑">
+  <meta name="twitter:description" content="北陸地区の道路をまとめたページです。">
+
+  <title>ほくりく道路図鑑 | お知らせ</title>
+  <link rel="stylesheet" href="https://hokurd.github.io/assets/css/common.css">
+  <link rel="icon" href="https://hokurd.github.io/assets/img/rd/country/471.png">
+</head>
+<body>
+  <header>
+    <h1><a href="https://hokurd.github.io/" style="color: white;"><div style="position:relative; display:inline-block;"><img src="https://hokurd.github.io/assets/img/rd/pref/toyama.png" alt="県道背景画像" style="height:48px; width:auto;"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -75%); display:flex; align-items:center; justify-content:center;"><img src="https://hokurd.github.io/assets/img/rd/pref/4.png" alt="県道数字画像" style="height:20px; width:auto;"><img src="https://hokurd.github.io/assets/img/rd/pref/8.png" alt="県道数字画像" style="height:20px; width:auto;"></div></div> ほくりく道路図鑑しました。</a></h1>
+  </header>
+
+  <div class="container">
+    <aside id="menu"></aside>
+
+    <main id="content">
+      <section>
+        <h2>お知らせ</h2>
+        <p>過去のお知らせの一覧です。</p>
+        <a href="https://hokurd.github.io/" class="contact-button"><span class="icon icon_2">重要</span><br>2025/11/30<br>サイトを作成しました。</a>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    <p>Copyright © いゆかも工房 All rights reserved.</p>
+  </footer>
+
+  <script>
+    fetch('https://hokurd.github.io/assets/json/menu.json')
+      .then(res => res.json())
+      .then(data => {
+        const menu = document.getElementById('menu');
+        const ul = document.createElement('ul');
+        data.forEach(item => {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = item.link;
+          a.textContent = item.title;
+          li.appendChild(a);
+          ul.appendChild(li);
+        });
+        menu.appendChild(ul);
+      });
+  </script>
+</body>
+</html>
