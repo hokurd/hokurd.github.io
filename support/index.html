@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="北陸地区の駅メロディーをまとめたページです。">
+  <meta name="robots" content="index, follow">
+
+  <meta property="og:title" content="ほくりく道路図鑑">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ほくりく道路図鑑">
+  <meta property="og:locale" content="ja_JP">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="ほくりく道路図鑑">
+  <meta name="twitter:description" content="北陸地区の駅メロディーをまとめたページです。">
+
+  <title>ほくりく道路図鑑 | 問い合わせ</title>
+  <link rel="stylesheet" href="https://hokurd.github.io/assets/css/common.css">
+  <link rel="icon" href="https://hokurd.github.io/assets/img/car/683_thunderbird.png">
+</head>
+<body>
+  <header>
+    <h1><a href="https://hokurd.github.io/" style="color: white;"><img src="https://hokurd.github.io/assets/img/car/683_thunderbird.png" alt="鉄道車両画像"> ほくりく道路図鑑</a></h1>
+  </header>
+
+  <div class="container">
+    <aside id="menu"></aside>
+
+    <main id="content">
+      <section>
+        <h2>問い合わせ</h2>
+        <p>問い合わせ方法は以下の通りです。</p>
+        <a href="https://discord.gg/Qa7p74YCfh" class="contact-button"><img src="https://hokurd.github.io/assets/img/car/discord.png" alt="Discord" class="text-image"> Discordサーバー</a>
+        <a href="https://forms.gle/iGUxiCi1Q9uHKSV5A" class="contact-button">フォーム</a>
+      </section>
+      <div class="spacer"></div>
+      <section>
+        <h2>よくある質問<span style="font-size: 0.7em;">でもない単純に気になった疑問</span><span style="font-size: 0.5em;">だからFAQじゃなくてQ&A</span></h2>
+        <h3>高速道路や国道、県道の標識が正しく表示されていない。</h3>
+        <p>サイトの構造上修正ができないため正常です。</p>
+        <h3>「000」と表示されている。</h3>
+        <p>作成途中の箇所やページです。ページが完成したら削除されます。</p>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    <p>Copyright © いゆかも工房 All rights reserved.</p>
+  </footer>
+
+  <script>
+    fetch('https://hokurd.github.io/assets/json/menu.json')
+      .then(res => res.json())
+      .then(data => {
+        const menu = document.getElementById('menu');
+        const ul = document.createElement('ul');
+        data.forEach(item => {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = item.link;
+          a.textContent = item.title;
+          li.appendChild(a);
+          ul.appendChild(li);
+        });
+        menu.appendChild(ul);
+      });
+  </script>
+</body>
+</html>
