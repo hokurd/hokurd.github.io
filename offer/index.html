@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="北陸地区の道路をまとめたページです。">
+  <meta name="robots" content="index, follow">
+
+  <meta property="og:title" content="ほくりく道路図鑑">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ほくりく道路図鑑">
+  <meta property="og:locale" content="ja_JP">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="ほくりく道路図鑑">
+  <meta name="twitter:description" content="北陸地区の道路をまとめたページです。">
+
+  <title>ほくりく道路図鑑 | 提供</title>
+  <link rel="stylesheet" href="https://hokurd.github.io/assets/css/common.css">
+  <link rel="icon" href="https://hokurd.github.io/assets/img/rd/country/289.png">
+</head>
+<body>
+  <header>
+    <h1><a href="https://hokurd.github.io/" style="color: white;"><div style="position:relative; display:inline-block;"><img src="https://hokurd.github.io/assets/img/rd/pref/fukui.png" alt="県道背景画像" style="height:48px; width:auto;"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -75%); display:flex; align-items:center; justify-content:center;"><img src="https://hokurd.github.io/assets/img/rd/pref/2.png" alt="県道数字画像" style="height:20px; width:auto;"><img src="https://hokurd.github.io/assets/img/rd/pref/2.png" alt="県道数字画像" style="height:20px; width:auto;"><img src="https://hokurd.github.io/assets/img/rd/pref/8.png" alt="県道数字画像" style="height:20px; width:auto;"></div></div> ほくりく道路図鑑</a></h1>
+  </header>
+
+  <div class="container">
+    <aside id="menu"></aside>
+
+    <main id="content">
+      <section>
+        <h2>提供</h2>
+        <p>提供して頂いた写真の一覧です。</p>
+      </section>
+      <div class="spacer"></div>
+      <section>
+        <h2>写真・画像</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>内容</th>
+              <th>撮影地</th>
+              <td>名前等（敬称略）</td>
+              <td>撮影機器等</td>
+              <td>概要</td>
+              <td>識別</td>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th>鉄道写真・メロディー募集中</th>
+              <th>募集エリアは</th>
+              <td>新潟・富山・石川・福井の</td>
+              <td>4県です</td>
+              <td>編集していることなどは明記してください</td>
+              <td>いゆかも工房</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>写真が不足しています。提供をお願い致します。</p>
+        <a href="https://forms.gle/iGUxiCi1Q9uHKSV5A" class="contact-button-round">画像を提供する</a>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    <p>Copyright © いゆかも工房 All rights reserved.</p>
+  </footer>
+
+  <script>
+    fetch('https://hokurd.github.io/assets/json/menu.json')
+      .then(res => res.json())
+      .then(data => {
+        const menu = document.getElementById('menu');
+        const ul = document.createElement('ul');
+        data.forEach(item => {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = item.link;
+          a.textContent = item.title;
+          li.appendChild(a);
+          ul.appendChild(li);
+        });
+        menu.appendChild(ul);
+      });
+  </script>
+</body>
+</html>
