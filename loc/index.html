@@ -56,26 +56,6 @@
       </section>
       <div class="spacer"></div>
       <section>
-        <h2>次のジャンクション</h2>
-        <div id="next-junction"></div>
-      </section>
-      <div class="spacer"></div>
-      <section>
-        <h2>次のインターチェンジ</h2>
-        <div id="next-interchange"></div>
-      </section>
-      <div class="spacer"></div>
-      <section>
-        <h2>次のパーキングエリア</h2>
-        <div id="next-pa"></div>
-      </section>
-      <div class="spacer"></div>
-      <section>
-        <h2>次のサービスエリア</h2>
-        <div id="next-sa"></div>
-      </section>
-      <div class="spacer"></div>
-      <section>
         <h2>最も近い高速道路</h2>
         <div id="nearest-motorway"></div>
         <div id="map-motorway" class="small-map"></div>
@@ -759,42 +739,6 @@
           } else {
             document.getElementById('nearest-pref').textContent = '最も近い県道は見つかりませんでした。';
             if(prefMap){ prefMap.remove(); prefMap = null; }
-          }
-          const radiusFacilities = 30000;
-          const kinds = [
-            {id:'next-junction', key:'junction'},
-            {id:'next-interchange', key:'interchange'},
-            {id:'next-pa', key:'pa'},
-            {id:'next-sa', key:'sa'}
-          ];
-          for(const k of kinds){
-            try{
-              const items = await findNearbyFacilities(lat, lon, radiusFacilities, lastHeading, k.key);
-              const container = document.getElementById(k.id);
-              container.innerHTML = '';
-              if(!items || items.length===0){
-                container.textContent = '該当する施設は近傍に見つかりませんでした。';
-                continue;
-              }
-              const it = items[0];
-              const name = (it.el && it.el.tags && (it.el.tags.name || it.el.tags.ref)) || '名称不明';
-              const p = document.createElement('div');
-              p.textContent = `${name} （約 ${Math.round(it.dist)} m）`;
-              container.appendChild(p);
-              if(it.el && it.el.tags){
-                const roadsDiv = document.createElement('div');
-                roadsDiv.className = 'road-list';
-                roadsDiv.appendChild(makeRoadAnchorElement(it.el.tags, false));
-                container.appendChild(roadsDiv);
-              }
-              try {
-                L.circleMarker([it.lat, it.lon], {radius:6, color:'#007', fillColor:'#0af', fillOpacity:0.7}).addTo(mainMap)
-                  .bindPopup(name);
-              } catch(e){}
-            } catch(e){
-              const container = document.getElementById(k.id);
-              container.textContent = '検索中にエラーが発生しました。';
-            }
           }
           const bounds = [];
           try {
