@@ -94,7 +94,6 @@
       for(const p of parts){
         if(/^\d+$/.test(p)) return p;
       }
-      // 末尾フォールバック
       return parts[0] || '';
     }
   
@@ -153,7 +152,7 @@
         const digits = String(refToken || (name.match(/(\d+)/) || [''])[0] || '');
         const digitImgs = digits.split('').map(d => `<img src="https://hokurd.github.io/assets/img/rd/pref/${escapeHtml(d || '0')}.png" alt="${escapeHtml(d)}" style="height:20px; width:auto;">`).join('');
         const prefKey = PREF_BG[currentPrefName] || (currentPrefName ? currentPrefName.replace(/県$/,'').toLowerCase() : 'unknown');
-        const href = `https://hokurd.github.io/road/pref/${encodeURIComponent(prefKey)}/road/?rd=${encodeURIComponent(digits)}`;
+        const href = `https://hokurd.github.io/road/pref/${encodeURIComponent(prefKey)}/${encodeURIComponent(digits)}/`;
         const inner = `<div style="position:relative; display:inline-block;"><img src="https://hokurd.github.io/assets/img/rd/pref/${bg}.png" alt="県道背景画像" style="height:48px; width:auto;"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -65%); display:flex; align-items:center; justify-content:center;">${digitImgs}</div></div>${escapeHtml(name || ('県道' + digits))}`;
         return `<a class="contact-button" href="${href}">${inner}</a>`;
       }
@@ -294,6 +293,16 @@
               if(nearestMotorway){
                 const mLatlngs = nearestMotorway.geometry.map(g => [g.lat, g.lon]);
                 L.polyline(mLatlngs, {color: 'orange', weight: 5, dashArray: '6 4', opacity: 0.8}).addTo(map);
+                const el = document.getElementById('map-motorway');
+                if(el && nearestMotorway.geometry && nearestMotorway.geometry.length){
+                  if(el._leaflet_id){ el._leaflet_id = null; el.innerHTML = ''; }
+                  try {
+                    const motorwayMap = L.map('map-motorway', { attributionControl: false, zoomControl: false }).setView([mLatlngs[0][0], mLatlngs[0][1]], 13);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap contributors' }).addTo(motorwayMap);
+                    L.polyline(mLatlngs, {color: 'orange', weight: 5, dashArray: '6 4', opacity: 0.9}).addTo(motorwayMap);
+                    motorwayMap.fitBounds(mLatlngs, {padding: [10,10]});
+                  } catch(e){ /* ignore */ }
+                }
               }
   
               if(nearestTrunk){
