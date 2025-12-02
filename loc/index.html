@@ -416,65 +416,6 @@
           return { label: null, roads, point: nearestPoint };
         }).catch(()=> ({label:null, roads:connectedWays||[], point:nearestPoint}));
       }
-      function findNearbyFacilities(lat, lon, radius, heading, kind){
-        const kw = {
-          junction: '(JCT|ジャンクション)',
-          interchange: '(IC|インターチェンジ)',
-          pa: '(PA|パーキングエリア|パーキング)',
-          sa: '(SA|サービスエリア|サービスエリア)',
-        }[kind] || '';
-        if(!kw) return Promise.resolve([]);
-        let q;
-        if(kind === 'interchange'){
-          q = `
-  [out:json][timeout:25];
-  (
-    node(around:${radius},${lat},${lon})[highway=motorway_junction];
-    node(around:${radius},${lat},${lon})[junction~"motorway",i];
-    node(around:${radius},${lat},${lon})[name~"${kw}",i][highway];
-    way(around:${radius},${lat},${lon})[highway=motorway_junction];
-    way(around:${radius},${lat},${lon})[name~"${kw}",i];
-  );
-  out center;
-  `;
-        } else if(kind === 'junction'){
-          q = `
-  [out:json][timeout:25];
-  (
-    node(around:${radius},${lat},${lon})[name~"${kw}",i];
-    way(around:${radius},${lat},${lon})[name~"${kw}",i];
-  );
-  out center;
-  `;
-        } else {
-          q = `
-  [out:json][timeout:25];
-  (
-    node(around:${radius},${lat},${lon})[name~"${kw}",i];
-    way(around:${radius},${lat},${lon})[name~"${kw}",i];
-    node(around:${radius},${lat},${lon})[highway=services];
-  );
-  out center;
-  `;
-        }
-        return fetchOverpass(q)
-          .then(d => {
-            if(!d || !d.elements) return [];
-            const items = d.elements.map(el => {
-              const elLat = el.type === 'node' ? el.lat : (el.center?el.center.lat:null);
-              const elLon = el.type === 'node' ? el.lon : (el.center?el.center.lon:null);
-              if(elLat == null || elLon == null) return null;
-              const dist = distanceMeters(lat, lon, elLat, elLon);
-              const brg = bearingBetween(lat, lon, elLat, elLon);
-              const ahead = (heading == null) ? true : angleDiff(heading, brg) <= 90;
-              return { el, lat: elLat, lon: elLon, dist, brg, ahead };
-            }).filter(Boolean);
-            const filtered = items.filter(i => i.ahead);
-            filtered.sort((a,b)=>a.dist-b.dist);
-            return filtered;
-          })
-          .catch(()=> []);
-      }
       function renderIntersectionSection(obj){
         const container = document.getElementById('next-intersection');
         container.innerHTML = '';
@@ -490,8 +431,12 @@
         listDiv.className = 'road-list';
         if(obj.roads && obj.roads.length){
           obj.roads.forEach(w => {
-            const el = makeRoadAnchorElement(w.tags || {}, false);
-            listDiv.appendChild(el);
+            const tags = w.tags || {};
+        
+            if ((tags.highway || '').toLowerCase() === 'residential') return;
+        
+            const el = makeRoadAnchorElement(tags, false);
+            if (el) listDiv.appendChild(el);
           });
         } else {
           const p = document.createElement('p');
