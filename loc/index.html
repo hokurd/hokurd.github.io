@@ -591,8 +591,16 @@
           const title = document.createElement('div');
           title.textContent = '現在走行中: ' + shortRoadLabel(nearestWay.tags || {}) + ` （約 ${Math.round(minD)} m）`;
           currentRoadContainer.appendChild(title);
-          const linkable = isMotorwayWay(nearestWay.tags) || isNationalWay(nearestWay.tags) || isPrefectureWay(nearestWay.tags);
-          currentRoadContainer.appendChild(makeRoadAnchorElement(nearestWay.tags || {}, linkable));
+          if(obj.roads && obj.roads.length){
+            obj.roads.forEach(w => {
+              const tags = w.tags || {};
+          
+              if ((tags.highway || '').toLowerCase() === 'residential') return;
+          
+              const el = makeRoadAnchorElement(tags, false);
+              if (el) listDiv.appendChild(el);
+            });
+          }
           try {
             const currentLatlngs = nearestWay.geometry.map(g => [g.lat, g.lon]);
             L.polyline(currentLatlngs, {color:'red', weight:6, opacity:0.9}).addTo(mainMap);
