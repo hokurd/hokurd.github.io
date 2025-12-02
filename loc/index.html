@@ -15,7 +15,7 @@
   <meta name="twitter:title" content="ほくりく道路図鑑">
   <meta name="twitter:description" content="北陸地区の道路をまとめたページです。">
 
-  <title>ほくりく道路図鑑 | 管理から選ぶ</title>
+  <title>ほくりく道路図鑑 | 現在地から探す</title>
   <link rel="stylesheet" href="https://hokurd.github.io/assets/css/common.css">
   <link rel="icon" href="https://hokurd.github.io/assets/img/rd/country/41.png">
 </head>
@@ -35,13 +35,17 @@
       <div class="spacer"></div>
       <section>
       <h2>現在地</h2>
-        <!--ここに現在地画像をopenstreetmapで-->
+        <div id="map" style="width:100%; height:400px;"></div>
       </section>
       <div class="spacer"></div>
       <section>
         <h2>今走行している道路</h2>
-        <!--ここに今走行している道路をopenstreetmapでルート表示など-->
-        <a href="ここに道路リンク" class="contact-button">国道なら「<img src="https://hokumelo.github.io/assets/img/rd/country/番号.png" alt="国道画像">」 道路名（国道8号線、富山県道44号富山高岡線など）</a>
+        <div id="current-road"></div>
+      </section>
+      <div class="spacer"></div>
+      <section>
+        <h2>次の交差点</h2>
+        <div id="next-intersection"></div>
       </section>
     </main>
   </div>
@@ -50,6 +54,115 @@
     <p>Copyright © いゆかも工房 All rights reserved.</p>
   </footer>
 
+  <script>
+    function makeRoadLink(tags) {
+      if (!tags || !tags.ref) return "その他の道路";
+      let ref = tags.ref;
+      let highway = tags.highway || "";
+
+      if ((highway === "trunk" || highway === "primary") && ref.match(/^\d+$/)) {
+        return `<a href="https://hokurd.github.io/road/gen/${ref}/">国道${ref}号</a>`;
+      }
+      if (highway === "motorway" && ref.match(/^E\d+/i)) {
+        return `<a href="https://hokurd.github.io/road/expwy/${ref.toLowerCase()}/">高速道路 ${ref}</a>`;
+      }
+      if ((highway === "primary" || highway === "secondary") && ref.match(/県道/)) {
+        let m = ref.match(/(.+?)県道(\d+)/);
+        if (m) {
+          let pref = m[1].toLowerCase();
+          let num = m[2];
+          return `<a href="https://hokurd.github.io/road/pref/${pref}/${num}/">${ref}</a>`;
+        }
+      }
+      return "その他の道路";
+    }
+
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      var lat = pos.coords.latitude;
+      var lon = pos.coords.longitude;
+
+      var map = L.map('map').setView([lat, lon], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(map);
+      L.marker([lat, lon]).addTo(map).bindPopup("現在地").openPopup();
+
+      var query = `
+        [out:json][timeout:25];
+        (
+          area["name"="新潟県"]->.niigata;
+          area["name"="富山県"]->.toyama;
+          area["name"="石川県"]->.ishikawa;
+          area["name"="福井県"]->.fukui;
+        );
+        (
+          way["highway"="motorway"](area.niigata);
+          way["highway"="trunk"](area.niigata);
+          way["highway"="primary"](area.niigata);
+          way["highway"="secondary"](area.niigata);
+
+          way["highway"="motorway"](area.toyama);
+          way["highway"="trunk"](area.toyama);
+          way["highway"="primary"](area.toyama);
+          way["highway"="secondary"](area.toyama);
+
+          way["highway"="motorway"](area.ishikawa);
+          way["highway"="trunk"](area.ishikawa);
+          way["highway"="primary"](area.ishikawa);
+          way["highway"="secondary"](area.ishikawa);
+
+          way["highway"="motorway"](area.fukui);
+          way["highway"="trunk"](area.fukui);
+          way["highway"="primary"](area.fukui);
+          way["highway"="secondary"](area.fukui);
+        );
+        out body;
+        >;
+        out skel qt;
+      `;
+
+      fetch("https://overpass-api.de/api/interpreter", {
+        method: "POST",
+        body: query
+      })
+      .then(res => res.json())
+      .then(data => {
+        var nearest = null, minDist = Infinity;
+
+        function distance(lat1, lon1, lat2, lon2) {
+          var R = 6371e3;
+          var φ1 = lat1*Math.PI/180, φ2 = lat2*Math.PI/180;
+          var Δφ = (lat2-lat1)*Math.PI/180, Δλ = (lon2-lon1)*Math.PI/180;
+          var a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+          return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        data.elements.forEach(el => {
+          if (el.type==="way" && el.nodes) {
+            var latlngs = el.nodes.map(nid => {
+              var node = data.elements.find(e => e.type==="node" && e.id===nid);
+              return [node.lat, node.lon];
+            });
+            latlngs.forEach(pt => {
+              var d = distance(lat, lon, pt[0], pt[1]);
+              if (d < minDist) { minDist = d; nearest = el; }
+            });
+          }
+        });
+
+        if (nearest) {
+          document.getElementById("current-road").innerHTML = "現在走行中: " + makeRoadLink(nearest.tags);
+
+          var nextNode = nearest.nodes[1];
+          var connectedWays = data.elements.filter(e => e.type==="way" && e.nodes.includes(nextNode) && e.id !== nearest.id);
+
+          var crossingLinks = connectedWays.map(w => makeRoadLink(w.tags));
+          document.getElementById("next-intersection").innerHTML = "次の交差点で接続する道路: " + crossingLinks.join(", ");
+        }
+      });
+    });
+  </script>
+  
   <script>
     fetch('https://hokurd.github.io/assets/json/menu.json')
       .then(res => res.json())
