@@ -100,94 +100,82 @@
       }).addTo(map);
       L.marker([lat, lon]).addTo(map).bindPopup("現在地").openPopup();
   
-      var query = `
-        [out:json][timeout:25];
-        (
-          area["name"="新潟県"]->.niigata;
-          area["name"="富山県"]->.toyama;
-          area["name"="石川県"]->.ishikawa;
-          area["name"="福井県"]->.fukui;
-        );
-        (
-          way["highway"="motorway"](area.niigata);
-          way["highway"="trunk"](area.niigata);
-          way["highway"="primary"](area.niigata);
-          way["highway"="secondary"](area.niigata);
-  
-          way["highway"="motorway"](area.toyama);
-          way["highway"="trunk"](area.toyama);
-          way["highway"="primary"](area.toyama);
-          way["highway"="secondary"](area.toyama);
-  
-          way["highway"="motorway"](area.ishikawa);
-          way["highway"="trunk"](area.ishikawa);
-          way["highway"="primary"](area.ishikawa);
-          way["highway"="secondary"](area.ishikawa);
-  
-          way["highway"="motorway"](area.fukui);
-          way["highway"="trunk"](area.fukui);
-          way["highway"="primary"](area.fukui);
-          way["highway"="secondary"](area.fukui);
-        );
-        out body; >; out skel qt;
-      `;
-  
-      fetch("https://overpass-api.de/api/interpreter", {
-        method: "POST", body: query
-      })
-      .then(res => res.json())
-      .then(data => {
-        var nearest = null, minDist = Infinity;
-        var nearestTrunk = null, minTrunk = Infinity;
-        var nearestPref = null, minPref = Infinity;
-  
-        function distance(lat1, lon1, lat2, lon2) {
-          var R = 6371e3;
-          var φ1 = lat1*Math.PI/180, φ2 = lat2*Math.PI/180;
-          var Δφ = (lat2-lat1)*Math.PI/180, Δλ = (lon2-lon1)*Math.PI/180;
-          var a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
-          return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-  
-        data.elements.forEach(el => {
-          if (el.type==="way" && el.nodes) {
-            var latlngs = el.nodes.map(nid => {
-              var node = data.elements.find(e => e.type==="node" && e.id===nid);
-              return [node.lat, node.lon];
-            });
-            latlngs.forEach(pt => {
-              var d = distance(lat, lon, pt[0], pt[1]);
-              if (d < minDist) { minDist = d; nearest = el; }
-              if (el.tags && el.tags.highway === "trunk" && d < minTrunk) {
-                minTrunk = d; nearestTrunk = el;
-              }
-              if (el.tags && (el.tags.highway === "primary" || el.tags.highway === "secondary") && d < minPref) {
-                minPref = d; nearestPref = el;
-              }
-            });
-          }
-        });
-  
-        if (nearest) {
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ja`)
+        .then(res => res.json())
+        .then(locdata => {
+          var prefecture = locdata.address.state;
           document.getElementById("current-road").innerHTML =
-            "現在走行中: " + makeRoadLink(nearest.tags);
+            "現在地の都道府県: " + prefecture;
   
-          var nextNode = nearest.nodes[1];
-          var connectedWays = data.elements.filter(e => e.type==="way" && e.nodes.includes(nextNode) && e.id !== nearest.id);
-          var crossingLinks = connectedWays.map(w => makeRoadLink(w.tags));
-          document.getElementById("next-intersection").innerHTML =
-            "次の交差点で接続する道路: " + crossingLinks.join(", ");
-        }
+          var query = `
+            [out:json][timeout:25];
+            area["name"="${prefecture}"]->.target;
+            (
+              way["highway"="motorway"](area.target);
+              way["highway"="trunk"](area.target);
+              way["highway"="primary"](area.target);
+              way["highway"="secondary"](area.target);
+            );
+            out body; >; out skel qt;
+          `;
   
-        if (nearestTrunk) {
-          document.getElementById("nearest-trunk").innerHTML =
-            "最寄り国道: " + makeRoadLink(nearestTrunk.tags);
-        }
-        if (nearestPref) {
-          document.getElementById("nearest-pref").innerHTML =
-            "最寄り県道: " + makeRoadLink(nearestPref.tags);
-        }
-      });
+          fetch("https://overpass-api.de/api/interpreter", {
+            method: "POST", body: query
+          })
+          .then(res => res.json())
+          .then(data => {
+            var nearest = null, minDist = Infinity;
+            var nearestTrunk = null, minTrunk = Infinity;
+            var nearestPref = null, minPref = Infinity;
+  
+            function distance(lat1, lon1, lat2, lon2) {
+              var R = 6371e3;
+              var φ1 = lat1*Math.PI/180, φ2 = lat2*Math.PI/180;
+              var Δφ = (lat2-lat1)*Math.PI/180, Δλ = (lon2-lon1)*Math.PI/180;
+              var a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
+              return R*2*Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            }
+  
+            data.elements.forEach(el => {
+              if (el.type==="way" && el.nodes) {
+                var latlngs = el.nodes.map(nid => {
+                  var node = data.elements.find(e => e.type==="node" && e.id===nid);
+                  return [node.lat, node.lon];
+                });
+                latlngs.forEach(pt => {
+                  var d = distance(lat, lon, pt[0], pt[1]);
+                  if (d < minDist) { minDist = d; nearest = el; }
+                  if (el.tags && el.tags.highway === "trunk" && d < minTrunk) {
+                    minTrunk = d; nearestTrunk = el;
+                  }
+                  if (el.tags && (el.tags.highway === "primary" || el.tags.highway === "secondary") && d < minPref) {
+                    minPref = d; nearestPref = el;
+                  }
+                });
+              }
+            });
+  
+            if (nearest) {
+              document.getElementById("current-road").innerHTML +=
+                "<br>現在走行中: " + makeRoadLink(nearest.tags);
+  
+              var nextNode = nearest.nodes[1];
+              var connectedWays = data.elements.filter(e => e.type==="way" && e.nodes.includes(nextNode) && e.id !== nearest.id);
+              var crossingLinks = connectedWays.map(w => makeRoadLink(w.tags));
+              document.getElementById("next-intersection").innerHTML =
+                "次の交差点で接続する道路: " + crossingLinks.join(", ");
+            }
+  
+            if (nearestTrunk) {
+              document.getElementById("nearest-trunk").innerHTML =
+                "最寄り国道: " + makeRoadLink(nearestTrunk.tags);
+            }
+            if (nearestPref) {
+              document.getElementById("nearest-pref").innerHTML =
+                "最寄り県道: " + makeRoadLink(nearestPref.tags);
+            }
+          });
+        });
     });
   </script>
   
