@@ -50,6 +50,16 @@
         <h2>次の交差点</h2>
         <div id="next-intersection"></div>
       </section>
+      <div class="spacer"></div>
+      <section>
+        <h2>最も近い国道</h2>
+        <div id="nearest-trunk"></div>
+      </section>
+      <div class="spacer"></div>
+      <section>
+        <h2>最も近い県道</h2>
+        <div id="nearest-pref"></div>
+      </section>
     </main>
   </div>
 
@@ -164,6 +174,36 @@
         }
       });
     });
+
+    var nearestTrunk = null, minTrunk = Infinity;
+    var nearestPref = null, minPref = Infinity;
+    
+    data.elements.forEach(el => {
+      if (el.type==="way" && el.nodes) {
+        var latlngs = el.nodes.map(nid => {
+          var node = data.elements.find(e => e.type==="node" && e.id===nid);
+          return [node.lat, node.lon];
+        });
+        latlngs.forEach(pt => {
+          var d = distance(lat, lon, pt[0], pt[1]);
+          if (el.tags && el.tags.highway === "trunk" && d < minTrunk) {
+            minTrunk = d; nearestTrunk = el;
+          }
+          if (el.tags && (el.tags.highway === "primary" || el.tags.highway === "secondary") && d < minPref) {
+            minPref = d; nearestPref = el;
+          }
+        });
+      }
+    });
+    
+    if (nearestTrunk) {
+      document.getElementById("current-road").innerHTML += 
+        "<p>最寄り国道: " + makeRoadLink(nearestTrunk.tags) + "</p>";
+    }
+    if (nearestPref) {
+      document.getElementById("current-road").innerHTML += 
+        "<p>最寄り県道: " + makeRoadLink(nearestPref.tags) + "</p>";
+    }
   </script>
   
   <script>
