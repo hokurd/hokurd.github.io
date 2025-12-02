@@ -20,7 +20,7 @@
   <link rel="icon" href="https://hokurd.github.io/assets/img/rd/country/41.png">
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 </head>
 <body>
   <header>
@@ -40,33 +40,57 @@
       <div class="spacer"></div>
       <section>
         <h2>現在地</h2>
-        <div id="map" style="width:100%; height:400px;"></div>
+        <div id="map" style="width:100%; height:400px;" role="application" aria-label="現在地の地図"></div>
       </section>
       <div class="spacer"></div>
       <section>
-        <h2>今走行している道路</h2>
+        <h2>現在走行している道路</h2>
         <div id="current-road"></div>
+        <div id="map-current-road" class="small-map" aria-hidden="false"></div>
       </section>
       <div class="spacer"></div>
       <section>
         <h2>次の交差点</h2>
         <div id="next-intersection"></div>
+        <div id="map-next-intersection" class="small-map"></div>
+      </section>
+      <div class="spacer"></div>
+      <section>
+        <h2>次のジャンクション</h2>
+        <div id="next-junction"></div>
+      </section>
+      <div class="spacer"></div>
+      <section>
+        <h2>次のインターチェンジ</h2>
+        <div id="next-interchange"></div>
+      </section>
+      <div class="spacer"></div>
+      <section>
+        <h2>次のパーキングエリア</h2>
+        <div id="next-pa"></div>
+      </section>
+      <div class="spacer"></div>
+      <section>
+        <h2>次のサービスエリア</h2>
+        <div id="next-sa"></div>
       </section>
       <div class="spacer"></div>
       <section>
         <h2>最も近い高速道路</h2>
         <div id="nearest-motorway"></div>
-        <div id="map-motorway" style="width:100%; height:200px; margin-top:8px;"></div>
+        <div id="map-motorway" class="small-map"></div>
       </section>
       <div class="spacer"></div>
       <section>
         <h2>最も近い国道</h2>
         <div id="nearest-trunk"></div>
+        <div id="map-trunk" class="small-map"></div>
       </section>
       <div class="spacer"></div>
       <section>
         <h2>最も近い県道</h2>
         <div id="nearest-pref"></div>
+        <div id="map-pref" class="small-map"></div>
       </section>
     </main>
   </div>
@@ -76,359 +100,694 @@
   </footer>
 
   <script>
-    function escapeHtml(s){ return String(s || '').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-    
-    const PREF_BG = {
-      '富山県': 'toyama',
-      '新潟県': 'niigata',
-      '石川県': 'ishikawa',
-      '福井県': 'fukui'
-    };
-    
-    function pickRefToken(ref){
-      if(!ref) return '';
-      const parts = ref.split(/[\s;,\/]+/);
-      for(const p of parts) if(/^E\d+/i.test(p)) return p;
-      for(const p of parts) if(/^\d+$/.test(p)) return p;
-      return parts[0] || '';
-    }
-    
-    function isPrefectureWay(tags, currentPrefName){
-      if(!tags) return false;
-      const name = ((tags.name||'') + ' ' + (tags.ref||'') + ' ' + (tags.network||'')).trim();
-      if(/県道/.test(name)) return true;
-      if(/JP:pref/i.test(tags.network || '')) return true;
-      if(/^P\d+/i.test(tags.ref || '')) return true;
-      if(currentPrefName){
-        const shortPref = currentPrefName.replace(/県|府|都|道$/, '');
+    document.addEventListener('DOMContentLoaded', () => {
+      function escapeHtml(s){ return String(s || '').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  
+      const NOMINATIM_EMAIL = 'hokuriku.road.dictionary@gmail.com';
+  
+      const PREF_BG = {
+        '富山県': 'toyama',
+        '新潟県': 'niigata',
+        '石川県': 'ishikawa',
+        '福井県': 'fukui'
+      };
+  
+      let mainMap = null;
+      let motorwayMap = null;
+      let currentRoadMap = null;
+      let nextIntersectionMap = null;
+      let trunkMap = null;
+      let prefMap = null;
+  
+      let lastPos = null;
+      let prevPos = null;
+      let lastHeading = null;
+  
+      function sanitizeFileKey(k){
+        if(!k) return 'unknown';
+        const s = String(k).toLowerCase().replace(/県$/,'').replace(/[^a-z0-9_-]/g,'');
+        return s || 'unknown';
+      }
+  
+      function pickRefToken(ref){
+        if(!ref) return '';
+        const parts = ref.split(/[\s;,\/]+/);
+        for(const p of parts) if(/^E\d+/i.test(p)) return p;
+        for(const p of parts) if(/^\d+$/.test(p)) return p;
+        for(const p of parts) if(/^[Pp]\d+/.test(p)) return p;
+        return parts[0] || '';
+      }
+  
+      function distanceMeters(lat1, lon1, lat2, lon2){
+        const R = 6371e3;
+        const φ1 = lat1 * Math.PI/180;
+        const φ2 = lat2 * Math.PI/180;
+        const Δφ = (lat2 - lat1) * Math.PI/180;
+        const Δλ = (lon2 - lon1) * Math.PI/180;
+        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      }
+  
+      function bearingBetween(lat1, lon1, lat2, lon2){
+        const φ1 = lat1 * Math.PI/180;
+        const φ2 = lat2 * Math.PI/180;
+        const λ1 = lon1 * Math.PI/180;
+        const λ2 = lon2 * Math.PI/180;
+        const y = Math.sin(λ2-λ1) * Math.cos(φ2);
+        const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(λ2-λ1);
+        let θ = Math.atan2(y, x) * 180 / Math.PI;
+        θ = (θ + 360) % 360;
+        return θ;
+      }
+  
+      function angleDiff(a, b){
+        let d = Math.abs(a - b) % 360;
+        if (d > 180) d = 360 - d;
+        return d;
+      }
+  
+      function isMotorwayWay(tags){
+        if(!tags) return false;
+        if(tags.highway === 'motorway') return true;
+        if(/^E\d+/i.test(tags.ref || '')) return true;
+        if(/expressway|motorway/i.test(tags.network || '') || /expressway/i.test(tags.operator || '')) return true;
+        return false;
+      }
+  
+      function isPrefectureWay(tags, currentPrefName){
+        if(!tags) return false;
+        const name = ((tags.name||'') + ' ' + (tags.ref||'') + ' ' + (tags.network||'')).trim();
+        if(/県道/.test(name)) return true;
+        if(/JP:pref/i.test(tags.network || '')) return true;
+        if(/^P\d+/i.test(tags.ref || '')) return true;
+        if(currentPrefName){
+          const shortPref = currentPrefName.replace(/県|府|都|道$/, '');
+          try { if(new RegExp(shortPref).test(name)) return true; } catch(e){}
+        }
+        if((tags.highway === 'primary' || tags.highway === 'secondary') && /^\d+$/.test(pickRefToken(tags.ref || '')) && currentPrefName){
+          const shortPref = currentPrefName.replace(/県|府|都|道$/, '');
+          if((tags.name || '').includes(shortPref)) return true;
+        }
+        if(/^県道/i.test(tags.name || '')) return true;
+        return false;
+      }
+  
+      function isNationalWay(tags, currentPrefName){
+        if(!tags) return false;
+        if(isPrefectureWay(tags, currentPrefName)) return false;
+        if(tags.highway === 'trunk') return true;
+        const r = pickRefToken(tags.ref || '');
+        if(/^\d+$/.test(r)) return true;
+        if(/national|jp:road|road/i.test(tags.network||'')) return true;
+        return false;
+      }
+  
+      function shortRoadLabel(tags, currentPrefName){
+        if(!tags) return '不明な道路';
+        if(tags.name) return tags.name;
+        const r = pickRefToken(tags.ref || '');
+        if(isMotorwayWay(tags)) return (r ? r + ' ' : '') + (tags.name || '高速道路');
+        if(isNationalWay(tags, currentPrefName)) return (r ? '国道' + r + '号' : '国道');
+        if(isPrefectureWay(tags, currentPrefName)) return (r ? '県道' + r : '県道');
+        return tags.ref || tags.highway || '道路';
+      }
+  
+      function makeRoadAnchorElement(tags, currentPrefName){
+        const a = document.createElement('a');
+        a.className = 'contact-button';
+        a.href = '#';
+        a.setAttribute('role','link');
+  
+        const refToken = pickRefToken(tags && tags.ref ? tags.ref : '');
+        const name = tags && tags.name ? tags.name : '';
+  
+        if(isMotorwayWay(tags)){
+          const code = refToken || (tags.operator || '').replace(/\s+/g,'') || 'E?';
+          const href = `https://hokurd.github.io/road/expwy/${encodeURIComponent(code.toLowerCase())}/`;
+          a.href = href;
+          const span = document.createElement('span');
+          span.style.display='inline-block';
+          span.style.width='3em';
+          span.style.color='#ffffff';
+          span.style.borderRadius='2px';
+          span.style.textAlign='center';
+          span.style.padding='5px 0';
+          span.style.margin='2px';
+          span.style.backgroundColor='#00702c';
+          span.textContent = code;
+          a.appendChild(span);
+          a.appendChild(document.createTextNode(' ' + (name || code)));
+          return a;
+        }
+  
+        if(isPrefectureWay(tags, null)){
+          const bg = PREF_BG[tags['addr:state'] || ''] || sanitizeFileKey(tags['addr:state'] || '') || 'toyamafallback';
+          const digits = String(refToken || (name.match(/(\d+)/) || [''])[0] || '');
+          const wrapper = document.createElement('span');
+          wrapper.style.display='inline-flex';
+          wrapper.style.alignItems='center';
+  
+          const img = document.createElement('img');
+          img.src = `https://hokurd.github.io/assets/img/rd/pref/${encodeURIComponent(bg)}.png`;
+          img.alt = '県道背景画像';
+          img.className = 'inline-img';
+          wrapper.appendChild(img);
+  
+          if(digits){
+            const digitsSpan = document.createElement('span');
+            digits.split('').forEach(d=>{
+              const di = document.createElement('img');
+              di.src = `https://hokurd.github.io/assets/img/rd/pref/${encodeURIComponent(d||'0')}.png`;
+              di.alt = d;
+              di.style.height='20px';
+              di.style.width='auto';
+              digitsSpan.appendChild(di);
+            });
+            digitsSpan.style.marginLeft='6px';
+            wrapper.appendChild(digitsSpan);
+          }
+  
+          a.href = `https://hokurd.github.io/road/pref/${encodeURIComponent(bg)}/${encodeURIComponent(digits)}/`;
+          a.appendChild(wrapper);
+          a.appendChild(document.createTextNode(' ' + (name || ('県道' + digits))));
+          return a;
+        }
+  
+        if(isNationalWay(tags, null)){
+          const num = refToken || (name.match(/(\d+)/) || [''])[0] || '';
+          const href = `https://hokurd.github.io/road/gen/${encodeURIComponent(num)}/`;
+          a.href = href;
+          const img = document.createElement('img');
+          img.src = `https://hokurd.github.io/assets/img/rd/country/${encodeURIComponent(num)}.png`;
+          img.alt = '国道画像';
+          img.className = 'inline-img';
+          a.appendChild(img);
+          a.appendChild(document.createTextNode(' ' + (name || ('国道' + num + '号'))));
+          return a;
+        }
+  
+        a.textContent = (name || tags.ref || tags.highway || '道路');
+        return a;
+      }
+  
+      function fetchOverpass(q){
+        return fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: q })
+          .then(r => { if(!r.ok) throw new Error('Overpass error'); return r.json(); });
+      }
+  
+      function fetchNominatimReverse(lat, lon, zoom=18){
+        const emailPart = NOMINATIM_EMAIL ? `&email=${encodeURIComponent(NOMINATIM_EMAIL)}` : '';
+        return fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=${zoom}&accept-language=ja${emailPart}`)
+          .then(r => r.ok ? r.json() : null)
+          .catch(()=>null);
+      }
+  
+      function ensureMainMap(lat, lon){
+        if(!mainMap){
+          mainMap = L.map('map').setView([lat, lon], 15);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+          }).addTo(mainMap);
+        } else {
+          mainMap.setView([lat, lon], mainMap.getZoom() || 15);
+        }
+        return mainMap;
+      }
+  
+      function removeIfExists(mapVar){
         try {
-          if(new RegExp(shortPref).test(name)) return true;
+          if(mapVar && typeof mapVar.remove === 'function') mapVar.remove();
         } catch(e){}
       }
-      if((tags.highway === 'primary' || tags.highway === 'secondary') && /^\d+$/.test(pickRefToken(tags.ref || '')) && currentPrefName){
-        const shortPref = currentPrefName.replace(/県|府|都|道$/, '');
-        if((tags.name || '').includes(shortPref)) return true;
-      }
-      return false;
-    }
-    
-    function isMotorwayWay(tags){
-      if(!tags) return false;
-      if(tags.highway === 'motorway') return true;
-      if(/^E\d+/i.test(tags.ref || '')) return true;
-      return false;
-    }
-    
-    function isNationalWay(tags, currentPrefName){
-      if(!tags) return false;
-      if(isPrefectureWay(tags, currentPrefName)) return false; // 県道優先
-      if(tags.highway === 'trunk') return true;
-      const r = pickRefToken(tags.ref || '');
-      if(/^\d+$/.test(r)) return true;
-      return false;
-    }
-    
-    function shortRoadLabel(tags, currentPrefName){
-      if(!tags) return '不明な道路';
-      if(tags.name) return tags.name;
-      const r = pickRefToken(tags.ref || '');
-      if(isMotorwayWay(tags)) return (r ? r + ' ' : '') + (tags.name || '高速道路');
-      if(isNationalWay(tags, currentPrefName)) return (r ? '国道' + r + '号' : '国道');
-      if(isPrefectureWay(tags, currentPrefName)) return (r ? '県道' + r : '県道');
-      return tags.ref || tags.highway || '道路';
-    }
-    
-    function makeRoadAnchor(tags, currentPrefName){
-      const refToken = pickRefToken(tags && tags.ref ? tags.ref : '');
-      const name = tags && tags.name ? tags.name : '';
-    
-      if(isMotorwayWay(tags)){
-        const code = refToken || (tags.operator || '').replace(/\s+/g,'') || 'E?';
-        const href = `https://hokurd.github.io/road/expwy/${encodeURIComponent(code.toLowerCase())}/`;
-        const inner = `<span style="display: inline-block; width: 3em; color: #ffffff; border-radius: 2px; text-align: center; padding: 5px 0; margin: 2px; background-color: #00702c;">${escapeHtml(code)}</span>${escapeHtml(name || code)} `;
-        return `<a class="contact-button" href="${href}">${inner}</a>`;
-      }
-    
-      if(isPrefectureWay(tags, currentPrefName)){
-        const bg = PREF_BG[currentPrefName] || (currentPrefName ? (currentPrefName.replace(/県$/,'').toLowerCase()) : 'toyamafallback');
-        const digits = String(refToken || (name.match(/(\d+)/) || [''])[0] || '');
-        const digitImgs = digits.split('').map(d => `<img src="https://hokurd.github.io/assets/img/rd/pref/${escapeHtml(d||'0')}.png" alt="${escapeHtml(d)}" style="height:20px; width:auto;">`).join('');
-        const prefKey = PREF_BG[currentPrefName] || (currentPrefName ? currentPrefName.replace(/県$/,'').toLowerCase() : 'unknown');
-        const href = `https://hokurd.github.io/road/pref/${encodeURIComponent(prefKey)}/${encodeURIComponent(digits)}/`;
-        const inner = `<div style="position:relative; display:inline-block;"><img src="https://hokurd.github.io/assets/img/rd/pref/${bg}.png" alt="県道背景画像" style="height:48px; width:auto;"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -65%); display:flex; align-items:center; justify-content:center;"> ${digitImgs}</div></div>${escapeHtml(name || ('県道' + digits))}`;
-        return `<a class="contact-button" href="${href}">${inner}</a>`;
-      }
-    
-      if(isNationalWay(tags, currentPrefName)){
-        const num = refToken || (name.match(/(\d+)/) || [''])[0] || '';
-        const href = `https://hokurd.github.io/road/gen/${encodeURIComponent(num)}/`;
-        const img = `<img src="https://hokurd.github.io/assets/img/rd/country/${encodeURIComponent(num)}.png" alt="国道画像" style="height:48px; width:auto;"> `;
-        const inner = `${img}${escapeHtml(name || ('国道' + num + '号'))}`;
-        return `<a class="contact-button" href="${href}">${inner}</a>`;
-      }
-    
-      const display = escapeHtml(name || tags.ref || tags.highway || '道路');
-      return `<a class="contact-button" href="#">${display}</a>`;
-    }
-    
-    function distanceMeters(lat1, lon1, lat2, lon2){
-      const R = 6371e3;
-      const φ1 = lat1 * Math.PI/180;
-      const φ2 = lat2 * Math.PI/180;
-      const Δφ = (lat2 - lat1) * Math.PI/180;
-      const Δλ = (lon2 - lon1) * Math.PI/180;
-      const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2) * Math.sin(Δλ/2);
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    }
-    
-    function findNamedNodeNearby(nodes, point, tol){
-      if(!nodes || !point) return null;
-      for(const n of nodes){
-        if(!n.lat || !n.lon) continue;
-        const d = distanceMeters(point.lat, point.lon, n.lat, n.lon);
-        if(d <= tol && n.tags && (n.tags.name || n.tags.ref || n.tags['int_name'])) return n;
-      }
-      return null;
-    }
-    
-    function buildIntersectionLabel(connectedWays, nearestPoint, nodes, pref){
-      const tol = 15;
-      const namedNode = findNamedNodeNearby(nodes, nearestPoint, tol);
-      if(namedNode && namedNode.tags && namedNode.tags.name){
-        return Promise.resolve(namedNode.tags.name + ' の交差点');
-      }
-      const tryNominatim = () => {
-        if(!nearestPoint) return Promise.resolve(null);
-        return fetch(`https://nominatim.openstreetmap.org/reverse?lat=${nearestPoint.lat}&lon=${nearestPoint.lon}&format=json&zoom=18&accept-language=ja`)
-          .then(r => r.ok ? r.json() : null)
-          .then(loc => {
-            if(!loc) return null;
-            const name = loc.display_name || (loc.address && (loc.address.road || loc.address.pedestrian || loc.address.cycleway));
-            return name || null;
+  
+      function fetchAndDrawFullRouteByRef(refToken, highwayFilterRegex, mapContainerId){
+        if(!refToken) return Promise.resolve(null);
+        const rad = 50000;
+        if(!lastPos) return Promise.resolve(null);
+        const lat = lastPos.coords.latitude, lon = lastPos.coords.longitude;
+        const q = `
+  [out:json][timeout:25];
+  (
+    way(around:${rad},${lat},${lon})["ref"~"${refToken}",i]["highway"~"${highwayFilterRegex}",i];
+  );
+  out geom;
+  `;
+        return fetchOverpass(q)
+          .then(d => {
+            if(!d || !d.elements) return null;
+            const ways = d.elements.filter(e=>e.type==='way' && Array.isArray(e.geometry));
+            const allLatlngs = [];
+            ways.forEach(w => {
+              const latlngs = w.geometry.map(g => [g.lat, g.lon]);
+              if(latlngs.length) allLatlngs.push(latlngs);
+            });
+            const el = document.getElementById(mapContainerId);
+            if(!el) return {ways, allLatlngs};
+            let mapRef = null;
+            if(mapContainerId === 'map-motorway') { if(motorwayMap){ motorwayMap.remove(); motorwayMap = null; } }
+            if(mapContainerId === 'map-current-road') { if(currentRoadMap){ currentRoadMap.remove(); currentRoadMap = null; } }
+            if(mapContainerId === 'map-trunk') { if(trunkMap){ trunkMap.remove(); trunkMap = null; } }
+            if(mapContainerId === 'map-pref') { if(prefMap){ prefMap.remove(); prefMap = null; } }
+            try {
+              mapRef = L.map(mapContainerId, { attributionControl:false, zoomControl:false });
+              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution: '&copy; OpenStreetMap contributors' }).addTo(mapRef);
+              allLatlngs.forEach(ll => {
+                L.polyline(ll, {color: (highwayFilterRegex.match(/motorway/i)?'orange':'blue'), weight:4, opacity:0.9}).addTo(mapRef);
+              });
+              if(allLatlngs.length){
+                const bounds = allLatlngs.reduce((acc, cur) => acc.concat(cur), []);
+                mapRef.fitBounds(bounds, {padding:[10,10]});
+              } else {
+                mapRef.setView([lastPos.coords.latitude, lastPos.coords.longitude], 12);
+              }
+            } catch(e){
+              try { if(mapRef) mapRef.remove(); } catch(e){}
+            }
+            if(mapContainerId === 'map-motorway') motorwayMap = mapRef;
+            if(mapContainerId === 'map-current-road') currentRoadMap = mapRef;
+            if(mapContainerId === 'map-trunk') trunkMap = mapRef;
+            if(mapContainerId === 'map-pref') prefMap = mapRef;
+  
+            return {ways, allLatlngs};
           })
           .catch(()=> null);
-      };
-    
-      const cats = connectedWays.map(w => {
-        if(isPrefectureWay(w.tags, pref)) return 'pref';
-        if(isNationalWay(w.tags, pref)) return 'national';
-        if(isMotorwayWay(w.tags)) return 'motorway';
-        return 'other';
-      });
-    
-      return tryNominatim().then(nomName => {
-        if(nomName) return nomName + ' の交差点';
-        const uniq = Array.from(new Set(cats));
-        const filtered = uniq.filter(u => u==='pref' || u==='national');
-        if(filtered.length === 2 && filtered.includes('pref') && filtered.includes('national')) return '無名の交差点';
-        if(filtered.length === 1 && filtered[0] === 'pref' && cats.filter(x=>x==='pref').length >= 2) return '無名の交差点'; // pref-pref
-        if(filtered.length === 1 && filtered[0] === 'national' && cats.filter(x=>x==='national').length >= 2) return '無名の交差点'; // national-national
-        return null;
-      });
-    }
-    
-    
-    function onPosition(lat, lon){
-      const map = L.map('map').setView([lat, lon], 15);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(map);
-      const meMarker = L.marker([lat, lon]).addTo(map).bindPopup("現在地");
-    
-      const radius = 5000;
-      const query = `
-    [out:json][timeout:25];
-    (
-      way(around:${radius},${lat},${lon})["highway"~"motorway|trunk|primary|secondary"];
-      node(around:${radius},${lat},${lon})["name"];
-      node(around:${radius},${lat},${lon})["highway"~"traffic_signals|stop|crossing|give_way"];
-    );
-    out geom;
-    `;
-    
-      fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: query })
-        .then(r => { if(!r.ok) throw new Error('Overpass error'); return r.json(); })
-        .then(data => {
-          if(!data.elements || data.elements.length === 0){
-            document.getElementById('current-road').innerText = '近くの道路が見つかりませんでした。';
-            return;
+      }
+  
+      function centroidOfGeometry(geom){
+        if(!geom || !geom.length) return null;
+        let sumLat=0, sumLon=0;
+        geom.forEach(p => { sumLat += p.lat || p[0]; sumLon += p.lon || p[1]; });
+        return {lat: sumLat/geom.length, lon: sumLon/geom.length};
+      }
+  
+      function buildIntersectionLabelAndRoads(connectedWays, nearestPoint, nodes, pref){
+        const tol = 15;
+        for(const n of nodes){
+          if(!n.lat || !n.lon) continue;
+          const d = distanceMeters(nearestPoint.lat, nearestPoint.lon, n.lat, n.lon);
+          if(d <= tol && n.tags && (n.tags.name || n.tags.ref || n.tags['int_name'])){
+            const label = (n.tags.name || n.tags['int_name'] || n.tags.ref) + ' の交差点';
+            const roads = connectedWays.concat([]);
+            return Promise.resolve({label, roads, point:{lat:n.lat, lon:n.lon}});
           }
-    
-          const ways = data.elements.filter(e => e.type === 'way' && e.geometry);
-          const nodes = data.elements.filter(e => e.type === 'node' && e.lat && e.lon && e.tags);
-    
-          let nearestWay = null, nearestPoint = null, nearestPointIndex = -1, minDist = Infinity;
-          ways.forEach(el => {
-            el.geometry.forEach((pt, idx) => {
-              const d = distanceMeters(lat, lon, pt.lat, pt.lon);
-              if(d < minDist){
-                minDist = d;
-                nearestWay = el;
-                nearestPoint = pt;
-                nearestPointIndex = idx;
+        }
+        return fetchNominatimReverse(nearestPoint.lat, nearestPoint.lon, 18).then(loc => {
+          let name = null;
+          if(loc){
+            name = loc.display_name || (loc.address && (loc.address.road || loc.address.pedestrian || loc.address.cycleway));
+          }
+          const roads = connectedWays || [];
+          if(name){
+            return { label: name + ' の交差点', roads, point: nearestPoint };
+          }
+          const cats = roads.map(w => {
+            if(isPrefectureWay(w.tags, pref)) return 'pref';
+            if(isNationalWay(w.tags, pref)) return 'national';
+            if(isMotorwayWay(w.tags)) return 'motorway';
+            return 'other';
+          });
+          const uniq = Array.from(new Set(cats));
+          if(uniq.length === 2 && uniq.includes('pref') && uniq.includes('national')) {
+            return { label: '無名の交差点', roads, point: nearestPoint };
+          }
+          if(uniq.length === 1 && (uniq[0] === 'pref' || uniq[0] === 'national') && cats.filter(x=>x===uniq[0]).length >= 2){
+            return { label: '無名の交差点', roads, point: nearestPoint };
+          }
+          return { label: null, roads, point: nearestPoint };
+        }).catch(()=> ({label:null, roads:connectedWays||[], point:nearestPoint}));
+      }
+  
+      function findNearbyFacilities(lat, lon, radius, heading, kind){
+        const keywords = {
+          junction: '(JCT|ジャンクション)',
+          interchange: '(IC|インターチェンジ)',
+          pa: '(PA|パーキングエリア|パーキング)',
+          sa: '(SA|サービスエリア|サービスエリア)',
+        };
+        const kw = keywords[kind] || '';
+        if(!kw) return Promise.resolve([]);
+        const q = `
+  [out:json][timeout:25];
+  (
+    node(around:${radius},${lat},${lon})[name~"${kw}",i];
+    way(around:${radius},${lat},${lon})[name~"${kw}",i];
+  );
+  out center;
+  `;
+        return fetchOverpass(q)
+          .then(d => {
+            if(!d || !d.elements) return [];
+            const items = d.elements.map(el => {
+              const elLat = el.type === 'node' ? el.lat : (el.center?el.center.lat:null);
+              const elLon = el.type === 'node' ? el.lon : (el.center?el.center.lon:null);
+              if(elLat == null || elLon == null) return null;
+              const dist = distanceMeters(lat, lon, elLat, elLon);
+              const brg = bearingBetween(lat, lon, elLat, elLon);
+              const ahead = (heading == null) ? true : angleDiff(heading, brg) <= 90;
+              return { el, lat: elLat, lon: elLon, dist, brg, ahead };
+            }).filter(Boolean);
+            const filtered = items.filter(i => i.ahead);
+            filtered.sort((a,b)=>a.dist-b.dist);
+            return filtered;
+          })
+          .catch(()=> []);
+      }
+  
+      function renderIntersectionSection(obj /*{label, roads, point}*/, pref){
+        const container = document.getElementById('next-intersection');
+        container.innerHTML = '';
+        if(!obj || !obj.point) {
+          container.textContent = '交差点名はありません（無名または対象外）';
+          if(nextIntersectionMap){ nextIntersectionMap.remove(); nextIntersectionMap = null; }
+          return;
+        }
+        const title = document.createElement('div');
+        title.textContent = obj.label || '無名の交差点';
+        container.appendChild(title);
+  
+        const listDiv = document.createElement('div');
+        listDiv.className = 'road-list';
+        if(obj.roads && obj.roads.length){
+          obj.roads.forEach(w => {
+            const a = makeRoadAnchorElement(w.tags || {}, pref);
+            listDiv.appendChild(a);
+          });
+        } else {
+          const p = document.createElement('p');
+          p.textContent = '交差している道路の情報はありません。';
+          listDiv.appendChild(p);
+        }
+        container.appendChild(listDiv);
+  
+        const elId = 'map-next-intersection';
+        if(nextIntersectionMap){ nextIntersectionMap.remove(); nextIntersectionMap = null; }
+        try {
+          nextIntersectionMap = L.map(elId, { attributionControl:false, zoomControl:false });
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution: '&copy; OpenStreetMap contributors' }).addTo(nextIntersectionMap);
+          L.marker([obj.point.lat, obj.point.lon]).addTo(nextIntersectionMap).bindPopup(obj.label || '交差点').openPopup();
+          const bounds = [[obj.point.lat, obj.point.lon]];
+          if(obj.roads && obj.roads.length){
+            obj.roads.forEach(w => {
+              if(w.geometry){
+                const latlngs = w.geometry.map(g=>[g.lat,g.lon]);
+                L.polyline(latlngs, {color:'purple', weight:4, opacity:0.8}).addTo(nextIntersectionMap);
+                bounds.push(...latlngs);
               }
             });
+          }
+          nextIntersectionMap.fitBounds(bounds, {padding:[10,10]});
+        } catch(e){
+          try { if(nextIntersectionMap) nextIntersectionMap.remove(); } catch(e){}
+        }
+      }
+  
+      function onPositionUpdate(position){
+        prevPos = lastPos;
+        lastPos = position;
+        if(position.coords && typeof position.coords.heading === 'number' && !isNaN(position.coords.heading)) {
+          lastHeading = position.coords.heading;
+        } else if(prevPos) {
+          const b = bearingBetween(prevPos.coords.latitude, prevPos.coords.longitude, lastPos.coords.latitude, lastPos.coords.longitude);
+          lastHeading = b;
+        } else {
+          lastHeading = null;
+        }
+  
+        try { updateNearbyInfo(position.coords.latitude, position.coords.longitude); } catch(e){ console.error(e); }
+      }
+  
+      let lastOverpassQueryTime = 0;
+      function updateNearbyInfo(lat, lon){
+        ensureMainMap(lat, lon);
+        const meMarker = L.marker([lat, lon]).addTo(mainMap).bindPopup("現在地");
+        mainMap.setView([lat, lon], mainMap.getZoom() || 15);
+  
+        const radius = 5000;
+        const query = `
+  [out:json][timeout:25];
+  (
+    way(around:${radius},${lat},${lon})["highway"~"motorway|trunk|primary|secondary|tertiary|unclassified|residential"];
+    node(around:${radius},${lat},${lon})["name"];
+    node(around:${radius},${lat},${lon})["highway"~"traffic_signals|stop|crossing|give_way"];
+  );
+  out geom;
+  `;
+  
+        fetchOverpass(query).then(data => {
+          if(!data || !data.elements || data.elements.length===0){
+            document.getElementById('current-road').textContent = '近くの道路が見つかりませんでした。';
+            return;
+          }
+  
+          const ways = data.elements.filter(e => e.type === 'way' && e.geometry);
+          const nodes = data.elements.filter(e => e.type === 'node' && e.lat && e.lon && e.tags);
+  
+          if(ways.length === 0){
+            document.getElementById('current-road').textContent = '近くの道路が見つかりませんでした。';
+            return;
+          }
+  
+          let nearestWay = null, nearestPoint = null, nearestPointIdx = -1, minD = Infinity;
+          ways.forEach(w => {
+            w.geometry.forEach((pt, idx) => {
+              const d = distanceMeters(lat, lon, pt.lat, pt.lon);
+              if(d < minD){ minD = d; nearestWay = w; nearestPoint = pt; nearestPointIdx = idx; }
+            });
           });
-    
-          fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=ja`)
-            .then(r => r.json())
-            .then(locdata => {
-              const pref = (locdata && locdata.address) ? (locdata.address.state || locdata.address.province || '') : '';
-    
-              if(!nearestWay){
-                document.getElementById('current-road').innerText = '現在走行中の道路を判定できませんでした。';
-                return;
+  
+          if(!nearestWay){
+            document.getElementById('current-road').textContent = '現在走行中の道路を判定できませんでした。';
+            return;
+          }
+  
+          fetchNominatimReverse(lat, lon).then(locdata => {
+            const pref = (locdata && locdata.address) ? (locdata.address.state || locdata.address.province || '') : '';
+  
+            let nearestMotorway = null, minMotorway = Infinity;
+            let nearestTrunk = null, minTrunk = Infinity;
+            let nearestPref = null, minPref = Infinity;
+  
+            ways.forEach(w => {
+              w.geometry.forEach(pt => {
+                const d = distanceMeters(lat, lon, pt.lat, pt.lon);
+                if(isMotorwayWay(w.tags) && d < minMotorway){ minMotorway = d; nearestMotorway = w; }
+                if(isPrefectureWay(w.tags, pref) && d < minPref){ minPref = d; nearestPref = w; }
+                if(isNationalWay(w.tags, pref) && d < minTrunk){ minTrunk = d; nearestTrunk = w; }
+              });
+            });
+  
+            const fallbackFindPref = () => {
+              if(nearestPref) return Promise.resolve(nearestPref);
+              const radius2 = 15000;
+              const q2 = `
+  [out:json][timeout:25];
+  way(around:${radius2},${lat},${lon})[name~"県道"];
+  out geom;
+  `;
+              return fetchOverpass(q2).then(d=>{
+                if(!d || !d.elements) return null;
+                let best=null, bestd=Infinity;
+                d.elements.forEach(w=>{
+                  if(!w.geometry) return;
+                  w.geometry.forEach(pt=>{
+                    const dd = distanceMeters(lat, lon, pt.lat, pt.lon);
+                    if(dd < bestd){ bestd = dd; best = w; }
+                  });
+                });
+                if(best){ nearestPref = best; minPref = bestd; }
+                return nearestPref;
+              }).catch(()=>null);
+            };
+  
+            fallbackFindPref().then(()=> {
+              const currentRoadContainer = document.getElementById('current-road');
+              currentRoadContainer.innerHTML = '';
+              const title = document.createElement('div');
+              title.textContent = '現在走行中: ' + shortRoadLabel(nearestWay.tags || {}, pref) + ` （約 ${Math.round(minD)} m）`;
+              currentRoadContainer.appendChild(title);
+  
+              const roadAnchorEl = makeRoadAnchorElement(nearestWay.tags || {}, pref);
+              currentRoadContainer.appendChild(roadAnchorEl);
+  
+              try {
+                const currentLatlngs = nearestWay.geometry.map(g => [g.lat, g.lon]);
+                L.polyline(currentLatlngs, {color:'red', weight:6, opacity:0.9}).addTo(mainMap);
+                if(nearestPoint){
+                  L.circleMarker([nearestPoint.lat, nearestPoint.lon], {radius:8, color:'#333', fillColor:'#fff', fillOpacity:0.8}).addTo(mainMap);
+                }
+              } catch(e){}
+  
+              const refToken = pickRefToken(nearestWay.tags && nearestWay.tags.ref ? nearestWay.tags.ref : '');
+              if(isMotorwayWay(nearestWay.tags)){
+                fetchAndDrawFullRouteByRef(refToken || (nearestWay.tags.operator||'').replace(/\s+/g,''), 'motorway', 'map-current-road')
+                  .then(()=>{})
+                  .catch(()=>{ /* ignore */ });
+              } else if(isNationalWay(nearestWay.tags, pref)){
+                fetchAndDrawFullRouteByRef(refToken, 'trunk|primary|secondary', 'map-current-road').catch(()=>{});
+              } else if(isPrefectureWay(nearestWay.tags, pref)){
+                fetchAndDrawFullRouteByRef(refToken, 'primary|secondary|tertiary|unclassified|residential', 'map-current-road').catch(()=>{});
+              } else {
+                if(currentRoadMap){ currentRoadMap.remove(); currentRoadMap = null; }
+                try {
+                  currentRoadMap = L.map('map-current-road', { attributionControl:false, zoomControl:false });
+                  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution: '&copy; OpenStreetMap contributors' }).addTo(currentRoadMap);
+                  const latlngs = nearestWay.geometry.map(g=>[g.lat,g.lon]);
+                  L.polyline(latlngs, {color:'red', weight:5, opacity:0.9}).addTo(currentRoadMap);
+                  currentRoadMap.fitBounds(latlngs, {padding:[10,10]});
+                } catch(e){}
               }
-    
-              let nearestMotorway = null, minMotorway = Infinity;
-              let nearestTrunk = null, minTrunk = Infinity;
-              let nearestPref = null, minPref = Infinity;
-    
-              ways.forEach(el => {
-                el.geometry.forEach(pt => {
-                  const d = distanceMeters(lat, lon, pt.lat, pt.lon);
-                  if(isMotorwayWay(el.tags) && d < minMotorway){ minMotorway = d; nearestMotorway = el; }
-                  if(isPrefectureWay(el.tags, pref) && d < minPref){ minPref = d; nearestPref = el; }
-                  if(isNationalWay(el.tags, pref) && d < minTrunk){ minTrunk = d; nearestTrunk = el; }
+  
+              const tol = 15;
+              const connected = ways.filter(e => {
+                if(e.id === nearestWay.id) return false;
+                return e.geometry && e.geometry.some(g => distanceMeters(g.lat, g.lon, nearestPoint.lat, nearestPoint.lon) <= tol);
+              });
+  
+              const candidatePoint = nearestPoint;
+              buildIntersectionLabelAndRoads(connected, candidatePoint, nodes, pref).then(obj => {
+                if(obj && (!obj.label) && lastHeading != null){
+                  const aheadNode = nodes.map(n=>{
+                    const d = distanceMeters(lat, lon, n.lat, n.lon);
+                    const brg = bearingBetween(lat, lon, n.lat, n.lon);
+                    return {...n, dist:d, brg, ahead: angleDiff(brg, lastHeading) <= 90};
+                  }).filter(n=>n.ahead && n.tags && (n.tags.name||n.tags.ref));
+                  if(aheadNode && aheadNode.length){
+                    const n0 = aheadNode.sort((a,b)=>a.dist-b.dist)[0];
+                    obj.label = (n0.tags.name || n0.tags.ref) + ' の交差点';
+                    obj.point = {lat:n0.lat, lon:n0.lon};
+                  }
+                }
+                renderIntersectionSection(obj, pref);
+              });
+  
+              if(nearestMotorway){
+                const nm = document.getElementById('nearest-motorway');
+                nm.innerHTML = '';
+                const title2 = document.createElement('div');
+                title2.textContent = `最も近い高速道路: ${shortRoadLabel(nearestMotorway.tags||{}, pref)} （約 ${Math.round(minMotorway)} m）`;
+                nm.appendChild(title2);
+                const a = makeRoadAnchorElement(nearestMotorway.tags||{}, pref);
+                nm.appendChild(a);
+  
+                const mRef = pickRefToken(nearestMotorway.tags && nearestMotorway.tags.ref ? nearestMotorway.tags.ref : (nearestMotorway.tags && nearestMotorway.tags.operator?nearestMotorway.tags.operator.replace(/\s+/g,''): ''));
+                fetchAndDrawFullRouteByRef(mRef, 'motorway', 'map-motorway').catch(()=>{});
+                try {
+                  const mLatlngs = nearestMotorway.geometry.map(g => [g.lat, g.lon]);
+                  L.polyline(mLatlngs, {color:'orange', weight:5, dashArray:'6 4', opacity:0.9}).addTo(mainMap);
+                } catch(e){}
+              } else {
+                document.getElementById('nearest-motorway').textContent = '最も近い高速道路は見つかりませんでした。';
+                if(motorwayMap){ motorwayMap.remove(); motorwayMap = null; }
+              }
+  
+              if(nearestTrunk){
+                const nt = document.getElementById('nearest-trunk');
+                nt.innerHTML = '';
+                const ttitle = document.createElement('div');
+                ttitle.textContent = `最も近い国道: ${shortRoadLabel(nearestTrunk.tags||{}, pref)} （約 ${Math.round(minTrunk)} m）`;
+                nt.appendChild(ttitle);
+                nt.appendChild(makeRoadAnchorElement(nearestTrunk.tags||{}, pref));
+                const tRef = pickRefToken(nearestTrunk.tags && nearestTrunk.tags.ref ? nearestTrunk.tags.ref : '');
+                fetchAndDrawFullRouteByRef(tRef, 'trunk|primary|secondary', 'map-trunk').catch(()=>{});
+                try {
+                  const tLatlngs = nearestTrunk.geometry.map(g => [g.lat, g.lon]);
+                  L.polyline(tLatlngs, {color:'blue', weight:5, opacity:0.8}).addTo(mainMap);
+                } catch(e){}
+              } else {
+                document.getElementById('nearest-trunk').textContent = '最も近い国道は見つかりませんでした。';
+                if(trunkMap){ trunkMap.remove(); trunkMap = null; }
+              }
+  
+              if(nearestPref){
+                const np = document.getElementById('nearest-pref');
+                np.innerHTML = '';
+                const ptitle = document.createElement('div');
+                ptitle.textContent = `最も近い県道: ${shortRoadLabel(nearestPref.tags||{}, pref)} （約 ${Math.round(minPref)} m）`;
+                np.appendChild(ptitle);
+                np.appendChild(makeRoadAnchorElement(nearestPref.tags||{}, pref));
+                const pRef = pickRefToken(nearestPref.tags && nearestPref.tags.ref ? nearestPref.tags.ref : '');
+                fetchAndDrawFullRouteByRef(pRef, 'primary|secondary|tertiary|unclassified', 'map-pref').catch(()=>{});
+                try {
+                  const pLatlngs = nearestPref.geometry.map(g => [g.lat, g.lon]);
+                  L.polyline(pLatlngs, {color:'green', weight:5, opacity:0.8}).addTo(mainMap);
+                } catch(e){}
+              } else {
+                document.getElementById('nearest-pref').textContent = '最も近い県道は見つかりませんでした。';
+                if(prefMap){ prefMap.remove(); prefMap = null; }
+              }
+  
+              const radiusFacilities = 30000;
+              const kinds = [
+                {id:'next-junction', key:'junction'},
+                {id:'next-interchange', key:'interchange'},
+                {id:'next-pa', key:'pa'},
+                {id:'next-sa', key:'sa'}
+              ];
+              kinds.forEach(k=>{
+                findNearbyFacilities(lat, lon, radiusFacilities, lastHeading, k.key).then(items=>{
+                  const container = document.getElementById(k.id);
+                  container.innerHTML = '';
+                  if(!items || items.length===0){
+                    container.textContent = '該当する施設は近傍に見つかりませんでした。';
+                    return;
+                  }
+                  const it = items[0];
+                  const name = (it.el && it.el.tags && (it.el.tags.name || it.el.tags.ref)) || '名称不明';
+                  const p = document.createElement('div');
+                  p.textContent = `${name} （約 ${Math.round(it.dist)} m）`;
+                  container.appendChild(p);
+                  if(it.el && it.el.tags){
+                    const roadsDiv = document.createElement('div');
+                    roadsDiv.className = 'road-list';
+                    const anchor = makeRoadAnchorElement(it.el.tags, pref);
+                    roadsDiv.appendChild(anchor);
+                    container.appendChild(roadsDiv);
+                  }
+                  try {
+                    L.circleMarker([it.lat, it.lon], {radius:6, color:'#007', fillColor:'#0af', fillOpacity:0.7}).addTo(mainMap)
+                      .bindPopup(name);
+                  } catch(e){}
+                }).catch(()=> {
+                  const container = document.getElementById(k.id);
+                  container.textContent = '検索中にエラーが発生しました。';
                 });
               });
-    
-              const fallbackFindPref = () => {
-                if(nearestPref) return Promise.resolve(nearestPref);
-                const radius2 = 15000;
-                const q2 = `
-    [out:json][timeout:25];
-    way(around:${radius2},${lat},${lon})[name~"県道"];
-    out geom;
-    `;
-                return fetch('https://overpass-api.de/api/interpreter', {method:'POST', body:q2})
-                  .then(r => r.ok ? r.json() : null)
-                  .then(d => {
-                    if(!d || !d.elements) return null;
-                    let best = null, bestd = Infinity;
-                    d.elements.forEach(w => {
-                      if(!w.geometry) return;
-                      w.geometry.forEach(pt => {
-                        const dd = distanceMeters(lat, lon, pt.lat, pt.lon);
-                        if(dd < bestd){ bestd = dd; best = w; }
-                      });
-                    });
-                    if(best){ nearestPref = best; minPref = bestd; }
-                    return nearestPref;
-                  })
-                  .catch(()=> null);
-              };
-    
-              fallbackFindPref().then(() => {
-                let currentCategory = 'other';
-                if(isPrefectureWay(nearestWay.tags, pref)) currentCategory = 'pref';
-                else if(isMotorwayWay(nearestWay.tags)) currentCategory = 'motorway';
-                else if(isNationalWay(nearestWay.tags, pref)) currentCategory = 'national';
-    
-                document.getElementById('current-road').innerHTML = `現在走行中: ${makeRoadAnchor(nearestWay.tags || {}, pref)} （${Math.round(minDist)} m）`;
-    
-                const currentLatlngs = nearestWay.geometry.map(g => [g.lat, g.lon]);
-                L.polyline(currentLatlngs, {color:'red', weight:6, opacity:0.9}).addTo(map);
-    
-                if(nearestPoint){
-                  const circle = L.circle([nearestPoint.lat, nearestPoint.lon], {radius:8, color:'#333', fillColor:'#fff', fillOpacity:0.8}).addTo(map);
-                }
-    
-                const tol = 15;
-                const connected = ways.filter(e => {
-                  if(e.id === nearestWay.id) return false;
-                  return e.geometry.some(g => distanceMeters(g.lat, g.lon, nearestPoint.lat, nearestPoint.lon) <= tol);
-                });
-    
-                buildIntersectionLabel(connected, nearestPoint, nodes, pref).then(label => {
-                  if(label){
-                    if(label === '無名の交差点'){
-                      document.getElementById('next-intersection').textContent = label;
-                    } else {
-                      document.getElementById('next-intersection').textContent = label;
-                    }
-                    // Add popup on intersection marker if exists
-                    if(nearestPoint){
-                      const marker = L.marker([nearestPoint.lat, nearestPoint.lon], {icon: L.circleMarker([nearestPoint.lat, nearestPoint.lon])}).addTo(map);
-                      marker.bindPopup(escapeHtml(label)).openPopup();
-                    }
-                  } else {
-                    // No label to show as per rules
-                    document.getElementById('next-intersection').textContent = '交差点名はありません（無名または対象外）';
-                  }
-                });
-    
-                if(nearestMotorway){
-                  document.getElementById('nearest-motorway').innerHTML = `最も近い高速道路: ${makeRoadAnchor(nearestMotorway.tags||{}, pref)} （${Math.round(minMotorway)} m）`;
-                  // draw full motorway (orange)
-                  const mLatlngs = nearestMotorway.geometry.map(g => [g.lat, g.lon]);
-                  L.polyline(mLatlngs, {color:'orange', weight:5, dashArray:'6 4', opacity:0.9}).addTo(map);
-                  // small motorway map if element exists
-                  const el = document.getElementById('map-motorway');
-                  if(el && nearestMotorway.geometry && nearestMotorway.geometry.length){
-                    if(el._leaflet_id){ el._leaflet_id = null; el.innerHTML = ''; }
-                    try {
-                      const motorwayMap = L.map('map-motorway', { attributionControl:false, zoomControl:false }).setView([mLatlngs[0][0], mLatlngs[0][1]], 13);
-                      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{ attribution: '&copy; OpenStreetMap contributors' }).addTo(motorwayMap);
-                      L.polyline(mLatlngs, {color:'orange', weight:5, dashArray:'6 4', opacity:0.9}).addTo(motorwayMap);
-                      motorwayMap.fitBounds(mLatlngs, {padding:[10,10]});
-                    } catch(e){}
-                  }
-                } else {
-                  document.getElementById('nearest-motorway').textContent = '最も近い高速道路は見つかりませんでした。';
-                }
-    
-                if(nearestTrunk){
-                  document.getElementById('nearest-trunk').innerHTML = `最も近い国道: ${makeRoadAnchor(nearestTrunk.tags||{}, pref)} （${Math.round(minTrunk)} m）`;
-                  const tLatlngs = nearestTrunk.geometry.map(g => [g.lat, g.lon]);
-                  L.polyline(tLatlngs, {color:'blue', weight:5, opacity:0.8}).addTo(map);
-                } else {
-                  document.getElementById('nearest-trunk').textContent = '最も近い国道は見つかりませんでした。';
-                }
-    
-                if(nearestPref){
-                  document.getElementById('nearest-pref').innerHTML = `最も近い県道: ${makeRoadAnchor(nearestPref.tags||{}, pref)} （${Math.round(minPref)} m）`;
-                  const pLatlngs = nearestPref.geometry.map(g => [g.lat, g.lon]);
-                  L.polyline(pLatlngs, {color:'green', weight:5, opacity:0.8}).addTo(map);
-                } else {
-                  document.getElementById('nearest-pref').textContent = '最も近い県道は見つかりませんでした。';
-                }
-    
-                // adjust map view to include current road and nearest roads (avoid zooming out too far)
-                const bounds = [];
-                if(currentLatlngs.length) bounds.push(...currentLatlngs);
+  
+              const bounds = [];
+              try {
+                if(nearestWay.geometry && nearestWay.geometry.length) bounds.push(...nearestWay.geometry.map(g=>[g.lat,g.lon]));
                 if(nearestTrunk && nearestTrunk.geometry) bounds.push(...nearestTrunk.geometry.map(g=>[g.lat,g.lon]));
                 if(nearestPref && nearestPref.geometry) bounds.push(...nearestPref.geometry.map(g=>[g.lat,g.lon]));
                 if(nearestMotorway && nearestMotorway.geometry) bounds.push(...nearestMotorway.geometry.map(g=>[g.lat,g.lon]));
                 if(bounds.length){
-                  try { map.fitBounds(bounds, {padding:[40,40], maxZoom:16}); } catch(e){}
+                  try { mainMap.fitBounds(bounds, {padding:[40,40], maxZoom:16}); } catch(e){}
                 }
-              });
-            })
-            .catch(err=>{
-              console.error('Nominatim error', err);
-              document.getElementById('current-road').innerHTML = `現在走行中: ${makeRoadAnchor(nearestWay.tags||{}, '')} （${Math.round(minDist)} m）`;
+              } catch(e){}
             });
-        })
-        .catch(err => {
+          }).catch(err => {
+            console.error('Nominatim error', err);
+            document.getElementById('current-road').innerHTML = `現在走行中: ${escapeHtml(shortRoadLabel(nearestWay.tags||{}, ''))} （約 ${Math.round(minD)} m）`;
+          });
+  
+        }).catch(err => {
           console.error(err);
           document.getElementById('current-road').innerText = '道路データの取得に失敗しました。';
         });
-    }
-    
-    
-    if("geolocation" in navigator){
-      navigator.geolocation.getCurrentPosition(
-        pos => onPosition(pos.coords.latitude, pos.coords.longitude),
-        err => {
-          console.error('geolocation error', err);
-          document.getElementById('current-road').innerText = '現在地が取得できませんでした。ブラウザの位置情報許可を確認してください。';
-        },
-        {enableHighAccuracy: true, maximumAge: 10000, timeout: 10000}
-      );
-    }else{
-      document.getElementById('current-road').innerText = 'このブラウザでは位置情報が利用できません。';
-    }
+      }
+  
+      if("geolocation" in navigator){
+        const watchId = navigator.geolocation.watchPosition(
+          pos => onPositionUpdate(pos),
+          err => {
+            console.error('geolocation error', err);
+            document.getElementById('current-road').innerText = '現在地が取得できませんでした。ブラウザの位置情報許可を確認してください。';
+          },
+          {enableHighAccuracy: true, maximumAge: 5000, timeout: 15000}
+        );
+      } else {
+        document.getElementById('current-road').innerText = 'このブラウザでは位置情報が利用できません。';
+      }
+    });
   </script>
   
   <script>
