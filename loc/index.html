@@ -129,14 +129,14 @@
         const digits = String(refToken || (name.match(/(\d+)/) || [''])[0] || '');
         const digitImgs = digits.split('').map(d => `<img src="https://hokurd.github.io/assets/img/rd/pref/${escapeHtml(d || '0')}.png" alt="${escapeHtml(d)}" style="height:20px; width:auto;">`).join('');
         const href = `https://hokurd.github.io/road/pref/${encodeURIComponent((currentPrefName||'').replace(/県$/,'' ).toLowerCase())}/${encodeURIComponent(digits)}/`;
-        const inner = `<div style="position:relative; display:inline-block;"><img src="https://hokurd.github.io/assets/img/rd/pref/${bg}.png" alt="県道背景画像" style="height:48px; width:auto;"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -75%); display:flex; align-items:center; justify-content:center;">${digitImgs}</div></div>${escapeHtml(name || ('県道' + digits))}`;
+        const inner = `<div style="position:relative; display:inline-block;"><img src="https://hokurd.github.io/assets/img/rd/pref/${bg}.png" alt="県道背景画像" style="height:48px; width:auto;"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -65%); display:flex; align-items:center; justify-content:center;">${digitImgs}</div></div>${escapeHtml(name || ('県道' + digits))}`;
         return `<a class="contact-button" href="${href}">${inner}</a>`;
       }
   
       if(isNationalWay(tags)){
         const num = refToken || (name.match(/(\d+)/) || [''])[0] || '';
         const href = `https://hokurd.github.io/road/gen/${encodeURIComponent(num)}/`;
-        const img = `<img src="https://hokurd.github.io/assets/img/rd/country/${encodeURIComponent(num)}.png" alt="管理団体画像" style="height:48px; width:auto;">`;
+        const img = `<img src="https://hokurd.github.io/assets/img/rd/country/${encodeURIComponent(num)}.png" alt="国道画像" style="height:48px; width:auto;">`;
         const inner = `${img}${escapeHtml(name || ('国道' + num + '号'))}`;
         return `<a class="contact-button" href="${href}">${inner}</a>`;
       }
