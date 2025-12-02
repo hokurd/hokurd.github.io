@@ -592,14 +592,10 @@
           title.textContent = '現在走行中: ' + shortRoadLabel(nearestWay.tags || {}) + ` （約 ${Math.round(minD)} m）`;
           currentRoadContainer.appendChild(title);
           const tags = nearestWay.tags || {};
-          if ((tags.highway || '').toLowerCase() === 'residential') {
-            const span = document.createElement('span');
-            span.className = 'contact-button';
-            span.textContent = tags.name || tags.ref || '道路';
-            currentRoadContainer.appendChild(span);
-          } else {
+          if ((tags.highway || '').toLowerCase() !== 'residential') {
             const linkable = isMotorwayWay(tags) || isNationalWay(tags) || isPrefectureWay(tags);
-            currentRoadContainer.appendChild(makeRoadAnchorElement(tags, linkable));
+            const el = makeRoadAnchorElement(tags, linkable);
+            if (el) currentRoadContainer.appendChild(el);
           }
           try {
             const currentLatlngs = nearestWay.geometry.map(g => [g.lat, g.lon]);
