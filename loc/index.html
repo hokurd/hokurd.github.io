@@ -145,7 +145,7 @@
       if(isMotorwayWay(tags)){
         const code = refToken || (tags.operator || '').replace(/\s+/g,'') || 'E?';
         const href = `https://hokurd.github.io/road/expwy/${encodeURIComponent(code.toLowerCase())}/`;
-        const inner = `<span style="display: inline-block; width: 3em; color: #ffffff; border-radius: 2px; text-align: center; padding: 5px 0; margin: 2px; background-color: #00702c;">${escapeHtml(code)}</span>${escapeHtml(name || code)}`;
+        const inner = `<span style="display: inline-block; width: 3em; color: #ffffff; border-radius: 2px; text-align: center; padding: 5px 0; margin: 2px; background-color: #00702c;">${escapeHtml(code)}</span>${escapeHtml(name || code)} `;
         return `<a class="contact-button" href="${href}">${inner}</a>`;
       }
     
@@ -155,14 +155,14 @@
         const digitImgs = digits.split('').map(d => `<img src="https://hokurd.github.io/assets/img/rd/pref/${escapeHtml(d||'0')}.png" alt="${escapeHtml(d)}" style="height:20px; width:auto;">`).join('');
         const prefKey = PREF_BG[currentPrefName] || (currentPrefName ? currentPrefName.replace(/県$/,'').toLowerCase() : 'unknown');
         const href = `https://hokurd.github.io/road/pref/${encodeURIComponent(prefKey)}/${encodeURIComponent(digits)}/`;
-        const inner = `<div style="position:relative; display:inline-block;"><img src="https://hokurd.github.io/assets/img/rd/pref/${bg}.png" alt="県道背景画像" style="height:48px; width:auto;"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -65%); display:flex; align-items:center; justify-content:center;">${digitImgs}</div></div>${escapeHtml(name || ('県道' + digits))}`;
+        const inner = `<div style="position:relative; display:inline-block;"><img src="https://hokurd.github.io/assets/img/rd/pref/${bg}.png" alt="県道背景画像" style="height:48px; width:auto;"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -65%); display:flex; align-items:center; justify-content:center;"> ${digitImgs}</div></div>${escapeHtml(name || ('県道' + digits))}`;
         return `<a class="contact-button" href="${href}">${inner}</a>`;
       }
     
       if(isNationalWay(tags, currentPrefName)){
         const num = refToken || (name.match(/(\d+)/) || [''])[0] || '';
         const href = `https://hokurd.github.io/road/gen/${encodeURIComponent(num)}/`;
-        const img = `<img src="https://hokurd.github.io/assets/img/rd/country/${encodeURIComponent(num)}.png" alt="国道画像" style="height:48px; width:auto;">`;
+        const img = `<img src="https://hokurd.github.io/assets/img/rd/country/${encodeURIComponent(num)}.png" alt="国道画像" style="height:48px; width:auto;"> `;
         const inner = `${img}${escapeHtml(name || ('国道' + num + '号'))}`;
         return `<a class="contact-button" href="${href}">${inner}</a>`;
       }
