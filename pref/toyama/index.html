@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="北陸地区の道路をまとめたページです。">
+  <meta name="robots" content="index, follow">
+
+  <meta property="og:title" content="ほくりく道路図鑑">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ほくりく道路図鑑">
+  <meta property="og:locale" content="ja_JP">
+
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="ほくりく道路図鑑">
+  <meta name="twitter:description" content="北陸地区の道路をまとめたページです。">
+
+  <title>ほくりく道路図鑑 | 富山県道</title>
+  <link rel="stylesheet" href="https://hokurd.github.io/assets/css/common.css">
+  <link rel="icon" href="https://hokurd.github.io/assets/img/logo/toyama.png">
+</head>
+<body>
+  <header>
+    <h1><a href="https://hokurd.github.io/" style="color: white;"><img src="https://hokurd.github.io/assets/img/logo/toyama.png" alt="管理団体画像"> ほくりく道路図鑑</a></h1>
+  </header>
+
+  <div class="container">
+    <aside id="menu"></aside>
+
+    <main id="content">
+      <section>
+        <h2>富山県道</h2>
+        <p>富山県道の一覧です。</p>
+      </section>
+      <div class="spacer"></div>
+      <section>
+        <h2 id="gen">新潟県道</h2>
+        <a href="https://hokurd.github.io/mlit/#main" class="contact-button"><div style="position:relative; display:inline-block;"><img src="https://hokurd.github.io/assets/img/rd/pref/niigata.png" alt="県道背景画像" style="height:48px; width:auto;"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -65%); display:flex; align-items:center; justify-content:center;"><img src="https://hokurd.github.io/assets/img/rd/pref/4.png" alt="県道数字画像" style="height:20px; width:auto;"><img src="https://hokurd.github.io/assets/img/rd/pref/5.png" alt="県道数字画像" style="height:20px; width:auto;"></div></div> 主要地方道（1～76）</a>
+        <a href="https://hokurd.github.io/mlit/#gen100" class="contact-button"><div style="position:relative; display:inline-block;"><img src="https://hokurd.github.io/assets/img/rd/pref/niigata.png" alt="県道背景画像" style="height:48px; width:auto;"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -65%); display:flex; align-items:center; justify-content:center;"><img src="https://hokurd.github.io/assets/img/rd/pref/1.png" alt="県道数字画像" style="height:20px; width:auto;"><img src="https://hokurd.github.io/assets/img/rd/pref/6.png" alt="県道数字画像" style="height:20px; width:auto;"><img src="https://hokurd.github.io/assets/img/rd/pref/4.png" alt="県道数字画像" style="height:20px; width:auto;"></div></div> 一般県道（101～199）</a>
+        <a href="https://hokurd.github.io/mlit/#gen200" class="contact-button"><div style="position:relative; display:inline-block;"><img src="https://hokurd.github.io/assets/img/rd/pref/niigata.png" alt="県道背景画像" style="height:48px; width:auto;"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -65%); display:flex; align-items:center; justify-content:center;"><img src="https://hokurd.github.io/assets/img/rd/pref/2.png" alt="県道数字画像" style="height:20px; width:auto;"><img src="https://hokurd.github.io/assets/img/rd/pref/2.png" alt="県道数字画像" style="height:20px; width:auto;"><img src="https://hokurd.github.io/assets/img/rd/pref/2.png" alt="県道数字画像" style="height:20px; width:auto;"></div></div> 一般県道（200～299）</a>
+        <a href="https://hokurd.github.io/mlit/#gen300" class="contact-button"><div style="position:relative; display:inline-block;"><img src="https://hokurd.github.io/assets/img/rd/pref/niigata.png" alt="県道背景画像" style="height:48px; width:auto;"><div style="position:absolute; top:50%; left:50%; transform:translate(-50%, -65%); display:flex; align-items:center; justify-content:center;"><img src="https://hokurd.github.io/assets/img/rd/pref/3.png" alt="県道数字画像" style="height:20px; width:auto;"><img src="https://hokurd.github.io/assets/img/rd/pref/1.png" alt="県道数字画像" style="height:20px; width:auto;"><img src="https://hokurd.github.io/assets/img/rd/pref/6.png" alt="県道数字画像" style="height:20px; width:auto;"></div></div> 一般県道（300～379）</a>
+        <h3 id="main">主要地方道（1～76）</h3>
+      </section>
+    </main>
+  </div>
+
+  <footer>
+    <p>Copyright © いゆかも工房 All rights reserved.</p>
+  </footer>
+
+  <script>
+    fetch('https://hokurd.github.io/assets/json/menu.json')
+      .then(res => res.json())
+      .then(data => {
+        const menu = document.getElementById('menu');
+        const ul = document.createElement('ul');
+        data.forEach(item => {
+          const li = document.createElement('li');
+          const a = document.createElement('a');
+          a.href = item.link;
+          a.textContent = item.title;
+          li.appendChild(a);
+          ul.appendChild(li);
+        });
+        menu.appendChild(ul);
+      });
+  </script>
+</body>
+</html>
